@@ -44,6 +44,7 @@ TRANSCRIPT_BED_MT="/isilon/sequencing/CIDRSeqSuiteSoftware/RELEASES/5.0.0/aux_fi
 GAP_BED="/isilon/sequencing/CIDRSeqSuiteSoftware/RELEASES/5.0.0/aux_files/GRCh37.gaps.bed"
 NO_GAP_BED="/isilon/sequencing/CIDRSeqSuiteSoftware/RELEASES/5.0.0/aux_files/grch37.nogap.nochr.bed"
 VERACODE="/isilon/sequencing/CIDRSeqSuiteSoftware/resources/Veracode_hg18_hg19.csv"
+LCR="/isilon/sequencing/GATK_resource_bundle/MISC/btu356_LCR-hs37d5.bed"
 
 HAPMAP="/isilon/sequencing/GATK_resource_bundle/2.5/b37/hapmap_3.3.b37.vcf"
 OMNI_1KG="/isilon/sequencing/GATK_resource_bundle/2.5/b37/1000G_omni2.5.b37.vcf"
@@ -53,6 +54,8 @@ PHASE3_1KG_AUTOSOMES="/isilon/sequencing/1000genomes/Full_Project/Sep_2014/20130
 DBSNP_129="/isilon/sequencing/GATK_resource_bundle/2.8/b37/dbsnp_138.b37.excluding_sites_after_129.vcf"
 
 GATK_KEY="/isilon/sequencing/CIDRSeqSuiteSoftware/gatk/GATK_2/lee.watkins_jhmi.edu.key"
+
+QUEUE_LIST=`qstat -f -s r | egrep -v "^[0-9]|^-|^queue" | cut -d @ -f 1 | sort | uniq | egrep -v "bigmem.q|all.q|cgc.q|programmers.q" | datamash collapse 1 | awk '{print $1}'`
 
 #################################
 ##### MAKE A DIRECTORY TREE #####
@@ -128,7 +131,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | awk 'NR>1' \
 | sort -k 8,8 \
 | awk '{split($18,INDEL,";");split($8,smtag,"[@-]"); \
-print "qsub","-N","A.01_BWA_"$8"_"$2"_"$3"_"$4,\
+print "qsub","-q","'$QUEUE_LIST'","-N","A.01_BWA_"$8"_"$2"_"$3"_"$4,\
 "-pe slots 3",\
 "-j y",\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$8"_"$2"_"$3"_"$4".BWA.log",\
@@ -149,7 +152,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | awk 'BEGIN {FS="\t"} \
 gsub(/,/,",A.01_BWA_"$2"_",$3) \
 gsub(/,/,",INPUT=/isilon/sequencing/Seq_Proj/"$1"/TEMP/",$4) \
-{print "qsub","-N","B.01_MERGE_BAM_"$2"_"$1,\
+{print "qsub","-q","'$QUEUE_LIST'","-N","B.01_MERGE_BAM_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".MERGE.BAM.FILES.log",\
 "-hold_jid","A.01_BWA_"$2"_"$3, \
 "'$SCRIPT_DIR'""/B.01_MERGE_SORT_AGGRO.sh",\
@@ -164,7 +167,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","C.01_MARK_DUPLICATES_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","C.01_MARK_DUPLICATES_"$2"_"$1,\
 "-l mem_free=48G",\
 "-hold_jid","B.01_MERGE_BAM_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".MARK_DUPLICATES.log",\
@@ -176,7 +179,7 @@ print "qsub","-N","C.01_MARK_DUPLICATES_"$2"_"$1,\
 REALIGNER_TARGET_CREATOR ()
 {
 echo \
-qsub \
+qsub -q $QUEUE_LIST \
 -N D.01_REALIGNER_TARGET_CREATOR_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]}_chr$CHROMOSOME \
 -hold_jid C.01_MARK_DUPLICATES_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
 -o $CORE_PATH/${SAMPLE_INFO_ARRAY[0]}/LOGS/${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]}.REALIGNER_TARGET_CREATOR_chr$CHROMOSOME.log \
@@ -189,7 +192,7 @@ ${SAMPLE_INFO_ARRAY[4]} $CHROMOSOME
 INDEL_REALIGNER ()
 {
 echo \
-qsub \
+qsub -q $QUEUE_LIST \
 -N E.01_INDEL_REALIGNER_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]}_chr$CHROMOSOME \
 -hold_jid D.01_REALIGNER_TARGET_CREATOR_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]}_chr$CHROMOSOME \
 -o $CORE_PATH/${SAMPLE_INFO_ARRAY[0]}/LOGS/${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]}.INDEL_REALIGNER_chr$CHROMOSOME.log \
@@ -219,7 +222,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","D.02_PRINT_JUNK_ALIGNMENTS_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","D.02_PRINT_JUNK_ALIGNMENTS_"$2"_"$1,\
 "-hold_jid","C.01_MARK_DUPLICATES_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".PRINT_JUNK_ALIGNMENTS.log",\
 "'$SCRIPT_DIR'""/D.02_PRINT_JUNK_ALIGNMENTS.sh",\
@@ -244,7 +247,7 @@ BUILD_HOLD_ID_PATH_BQSR ()
 BQSR ()
 {
 echo \
-qsub \
+qsub -q $QUEUE_LIST \
 -N F.01_PERFORM_BQSR_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
 -l mem_free=46G \
 ${HOLD_ID_PATH} \
@@ -272,7 +275,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","G.01_FINAL_BAM_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","G.01_FINAL_BAM_"$2"_"$1,\
 "-hold_jid","F.01_PERFORM_BQSR_"$2"_"$1",D.02_PRINT_JUNK_ALIGNMENTS_"$2"_"$1,\
 "-l mem_free=15G",\
 "-j y",\
@@ -285,7 +288,7 @@ print "qsub","-N","G.01_FINAL_BAM_"$2"_"$1,\
 CALL_HAPLOTYPE_CALLER ()
 {
 echo \
-qsub \
+qsub -q $QUEUE_LIST \
 -N H.01_HAPLOTYPE_CALLER_${SAMPLE_INFO_ARRAY[0]}_${SAMPLE_INFO_ARRAY[1]}_chr$CHROMOSOME \
 -hold_jid G.01_FINAL_BAM_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
 -o $CORE_PATH/${SAMPLE_INFO_ARRAY[0]}/LOGS/${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]}.HAPLOTYPE_CALLER_chr$CHROMOSOME.log \
@@ -322,7 +325,7 @@ BUILD_HOLD_ID_PATH(){
 CALL_HAPLOTYPE_CALLER_GATHER ()
 {
 echo \
-qsub \
+qsub -q $QUEUE_LIST \
 -N H.01-A.01_HAPLOTYPE_CALLER_GATHER_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
 ${HOLD_ID_PATH} \
 -o $CORE_PATH/${SAMPLE_INFO_ARRAY[0]}/LOGS/${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]}.HAPLOTYPE_CALLER_GATHER.log \
@@ -349,7 +352,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($4,INDEL,";"); split($2,smtag,"[@-]"); \
-print "qsub","-N","H.02_POST_BQSR_TABLE_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","H.02_POST_BQSR_TABLE_"$2"_"$1,\
 "-l mem_free=46G",\
 "-hold_jid","G.01_FINAL_BAM_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".POST_BQSR_TABLE.log",\
@@ -365,7 +368,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","H.02-A.01_ANALYZE_COVARIATES_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","H.02-A.01_ANALYZE_COVARIATES_"$2"_"$1,\
 "-hold_jid","H.02_POST_BQSR_TABLE_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".ANALYZE_COVARIATES.log",\
 "'$SCRIPT_DIR'""/H.02-A.01_ANALYZE_COVARIATES.sh",\
@@ -380,7 +383,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","H.03_AUTO_DOC_CODING_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","H.03_AUTO_DOC_CODING_"$2"_"$1,\
 "-hold_jid","G.01_FINAL_BAM_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".DOC_AUTO_CODING.log",\
 "'$SCRIPT_DIR'""/H.03_DOC_AUTO_CODING.sh",\
@@ -395,7 +398,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","H.04_DOC_AUTO_WG_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","H.04_DOC_AUTO_WG_"$2"_"$1,\
 "-hold_jid","G.01_FINAL_BAM_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".DOC_AUTO_WG.log",\
 "'$SCRIPT_DIR'""/H.04_DOC_AUTO_WG.sh",\
@@ -410,7 +413,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","H.05_DOC_CODING_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","H.05_DOC_CODING_"$2"_"$1,\
 "-hold_jid","G.01_FINAL_BAM_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".DOC_CODING.log",\
 "'$SCRIPT_DIR'""/H.05_DOC_CODING.sh",\
@@ -425,7 +428,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","H.06_DOC_TRANSCRIPT_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","H.06_DOC_TRANSCRIPT_"$2"_"$1,\
 "-hold_jid","G.01_FINAL_BAM_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".DOC_TRANSCRIPT.log",\
 "'$SCRIPT_DIR'""/H.06_DOC_TRANSCRIPT.sh",\
@@ -440,7 +443,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","H.07_VERIFYBAMID_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","H.07_VERIFYBAMID_"$2"_"$1,\
 "-hold_jid","G.01_FINAL_BAM_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".VERIFYBAMID.log",\
 "'$SCRIPT_DIR'""/H.07_VERIFYBAMID.sh",\
@@ -455,7 +458,7 @@ print "qsub","-N","H.07_VERIFYBAMID_"$2"_"$1,\
 # | sort -k 1,1 -k 2,2 -k 3,3 \
 # | uniq \
 # | awk '{split($3,smtag,"[@-]"); \
-# print "qsub","-N","H.06_COLLECT_MULTIPLE_METRICS_"$3"_"$1,\
+# print "qsub","-q","'$QUEUE_LIST'","-N","H.06_COLLECT_MULTIPLE_METRICS_"$3"_"$1,\
 # "-hold_jid","G.01_FINAL_BAM_"$3"_"$1,\
 # "-o","'$CORE_PATH'/"$1"/"$2"/"$3"/LOGS/"$3"_"$1".COLLECT_MULTIPLE_METRICS.log",\
 # "'$SCRIPT_DIR'""/H.06_COLLECT_MULTIPLE_METRICS.sh",\
@@ -470,7 +473,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","H.08_INSERT_SIZE_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","H.08_INSERT_SIZE_"$2"_"$1,\
 "-hold_jid","G.01_FINAL_BAM_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".INSERT_SIZE.log",\
 "'$SCRIPT_DIR'""/H.08_INSERT_SIZE.sh",\
@@ -485,7 +488,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","H.09_ALIGNMENT_SUMMARY_METRICS_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","H.09_ALIGNMENT_SUMMARY_METRICS_"$2"_"$1,\
 "-hold_jid","G.01_FINAL_BAM_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".ALIGNMENT_SUMMARY_METRICS.log",\
 "'$SCRIPT_DIR'""/H.09_ALIGNMENT_SUMMARY_METRICS.sh",\
@@ -500,7 +503,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","H.10_BASECALL_Q_SCORE_DISTRIBUTION_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","H.10_BASECALL_Q_SCORE_DISTRIBUTION_"$2"_"$1,\
 "-hold_jid","G.01_FINAL_BAM_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".BASECALL_Q_SCORE_DISTRIBUTION.log",\
 "'$SCRIPT_DIR'""/H.10_BASECALL_Q_SCORE_DISTRIBUTION.sh",\
@@ -515,7 +518,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","H.11_GC_BIAS_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","H.11_GC_BIAS_"$2"_"$1,\
 "-hold_jid","G.01_FINAL_BAM_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".GC_BIAS.log",\
 "'$SCRIPT_DIR'""/H.11_GC_BIAS.sh",\
@@ -530,7 +533,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","H.12_MEAN_QUALITY_BY_CYCLE_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","H.12_MEAN_QUALITY_BY_CYCLE_"$2"_"$1,\
 "-hold_jid","G.01_FINAL_BAM_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".MEAN_QUALITY_BY_CYCLE.log",\
 "'$SCRIPT_DIR'""/H.12_MEAN_QUALITY_BY_CYCLE.sh",\
@@ -545,7 +548,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","H.13_OXIDATION_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","H.13_OXIDATION_"$2"_"$1,\
 "-hold_jid","G.01_FINAL_BAM_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".OXIDATION.log",\
 "'$SCRIPT_DIR'""/H.13_OXIDATION.sh",\
@@ -570,7 +573,7 @@ SAMPLE_INFO_ARRAY=(`sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET | awk '$8=="'$SAMPLE'"
 
 DISCORDANT_PE(){
 echo \
- qsub \
+ qsub -q $QUEUE_LIST \
  -N H14_DISCORDANT_PE_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -hold_jid G.01_FINAL_BAM_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -j y -o $CORE_PATH/${SAMPLE_INFO_ARRAY[0]}/LOGS/${SAMPLE_INFO_ARRAY[1]}_LUMPY_DISCORDANT_PE.log \
@@ -580,7 +583,7 @@ echo \
  
 SPLIT_READ(){
 echo \
- qsub \
+ qsub -q $QUEUE_LIST \
  -N H15_SPLIT_READ_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -hold_jid G.01_FINAL_BAM_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -j y -o $CORE_PATH/${SAMPLE_INFO_ARRAY[0]}/LOGS/${SAMPLE_INFO_ARRAY[1]}_LUMPY_SPLIT_READ.log \
@@ -590,7 +593,7 @@ echo \
  
 DISCORDANT_PE_HIST(){
 echo \
- qsub \
+ qsub -q $QUEUE_LIST \
  -N H16_DISCORDANT_PE_HIST_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -hold_jid G.01_FINAL_BAM_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},H.09_ALIGNMENT_SUMMARY_METRICS_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -j y -o $CORE_PATH/${SAMPLE_INFO_ARRAY[0]}/LOGS/${SAMPLE_INFO_ARRAY[1]}_LUMPY_DISCORDANT_PE_HIST.log \
@@ -600,7 +603,7 @@ echo \
 
 SORT_DISCORDANT_PE(){
 echo \
- qsub \
+ qsub -q $QUEUE_LIST \
  -N H14_A01_SORT_DISCORDANT_PE_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -hold_jid H14_DISCORDANT_PE_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -j y -o $CORE_PATH/${SAMPLE_INFO_ARRAY[0]}/LOGS/${SAMPLE_INFO_ARRAY[1]}_SORT_DISCORDANT_PE.log \
@@ -610,7 +613,7 @@ echo \
 
 SORT_SPLIT_READ(){
 echo \
- qsub \
+ qsub -q $QUEUE_LIST \
  -N H15_A01_SORT_SPLIT_READ_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -hold_jid H15_SPLIT_READ_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -j y -o $CORE_PATH/${SAMPLE_INFO_ARRAY[0]}/LOGS/${SAMPLE_INFO_ARRAY[1]}_SORT_SPLIT_READ.log \
@@ -620,7 +623,7 @@ echo \
 
 CREATE_EXCLUSION_BED(){
 echo \
- qsub \
+ qsub -q $QUEUE_LIST \
  -N I01_EXCLUSION_BED_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -hold_jid H14_A01_SORT_DISCORDANT_PE_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},H15_A01_SORT_SPLIT_READ_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},\
 H.04_DOC_AUTO_WG_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
@@ -631,7 +634,7 @@ H.04_DOC_AUTO_WG_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
 
 LUMPY_ALL_VCF(){
 echo \
- qsub \
+ qsub -q $QUEUE_LIST \
  -N I02_LUMPY_ALL_VCF_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -hold_jid H14_A01_SORT_DISCORDANT_PE_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},H15_A01_SORT_SPLIT_READ_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},\
 H.09_ALIGNMENT_SUMMARY_METRICS_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},H.08_INSERT_SIZE_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
@@ -642,7 +645,7 @@ H.09_ALIGNMENT_SUMMARY_METRICS_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},H
 
 LUMPY_ALL_BEDPE(){
 echo \
- qsub \
+ qsub -q $QUEUE_LIST \
  -N I03_LUMPY_ALL_BEDPE_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -hold_jid H14_A01_SORT_DISCORDANT_PE_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},H15_A01_SORT_SPLIT_READ_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},\
 H.09_ALIGNMENT_SUMMARY_METRICS_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},H.08_INSERT_SIZE_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
@@ -653,7 +656,7 @@ H.09_ALIGNMENT_SUMMARY_METRICS_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},H
 
 LUMPY_FILTERED_VCF(){
 echo \
- qsub \
+ qsub -q $QUEUE_LIST \
  -N J01_LUMPY_FILTERED_VCF_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -hold_jid H14_A01_SORT_DISCORDANT_PE_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},H15_A01_SORT_SPLIT_READ_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},\
 H.09_ALIGNMENT_SUMMARY_METRICS_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},H.08_INSERT_SIZE_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},\
@@ -665,7 +668,7 @@ I01_EXCLUSION_BED_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
 
 LUMPY_FILTERED_BEDPE(){
 echo \
- qsub \
+ qsub -q $QUEUE_LIST \
  -N J02_LUMPY_FILTERED_BEDPE_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -hold_jid H14_A01_SORT_DISCORDANT_PE_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},H15_A01_SORT_SPLIT_READ_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},\
 H.09_ALIGNMENT_SUMMARY_METRICS_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},H.08_INSERT_SIZE_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]},\
@@ -677,7 +680,7 @@ I01_EXCLUSION_BED_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
 
 LUMPY_ALL_VCF_GT(){
 echo \
- qsub \
+ qsub -q $QUEUE_LIST \
  -N I02-A.01_LUMPY_ALL_VCF_GT_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -hold_jid I02_LUMPY_ALL_VCF_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -j y -o $CORE_PATH/${SAMPLE_INFO_ARRAY[0]}/LOGS/${SAMPLE_INFO_ARRAY[1]}_LUMPY_ALL_VCF_GT.log \
@@ -687,7 +690,7 @@ echo \
 
 LUMPY_FILTERED_VCF_GT(){
 echo \
- qsub \
+ qsub -q $QUEUE_LIST \
  -N J01-A.01_LUMPY_FILTERED_VCF_GT_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -hold_jid J01_LUMPY_FILTERED_VCF_${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]} \
  -j y -o $CORE_PATH/${SAMPLE_INFO_ARRAY[0]}/LOGS/${SAMPLE_INFO_ARRAY[1]}_LUMPY_FILTERED_VCF_GT.log \
@@ -728,7 +731,7 @@ LUMPY_FILTERED_VCF_GT
 CALL_GENOTYPE_GVCF ()
 {
 echo \
-qsub \
+qsub -q $QUEUE_LIST \
 -N K.01_GENOTYPE_GVCF_${SAMPLE_INFO_ARRAY[0]}_${SAMPLE_INFO_ARRAY[1]}_chr$CHROMOSOME \
 -hold_jid H.01_HAPLOTYPE_CALLER_${SAMPLE_INFO_ARRAY[0]}_${SAMPLE_INFO_ARRAY[1]}_chr$CHROMOSOME \
 -o $CORE_PATH/${SAMPLE_INFO_ARRAY[0]}/LOGS/${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]}.GENOTYPE_GVCF_chr$CHROMOSOME.log \
@@ -750,7 +753,7 @@ CREATE_SAMPLE_INFO_ARRAY
 CALL_ANNOTATE_VCF ()
 {
 echo \
-qsub \
+qsub -q $QUEUE_LIST \
 -N L.01_ANNOTATE_VCF_${SAMPLE_INFO_ARRAY[0]}_${SAMPLE_INFO_ARRAY[1]}_chr$CHROMOSOME \
 -hold_jid K.01_GENOTYPE_GVCF_${SAMPLE_INFO_ARRAY[0]}_${SAMPLE_INFO_ARRAY[1]}_chr$CHROMOSOME \
 -o $CORE_PATH/${SAMPLE_INFO_ARRAY[0]}/LOGS/${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]}.ANNOTATE_VCF_chr$CHROMOSOME.log \
@@ -787,7 +790,7 @@ BUILD_HOLD_ID_PATH_VCF(){
 CALL_GATHER_VCF ()
 {
 echo \
-qsub \
+qsub -q $QUEUE_LIST \
 -N M.01_GATHER_VCF_${SAMPLE_INFO_ARRAY[0]}_${SAMPLE_INFO_ARRAY[1]} \
 ${HOLD_ID_PATH} \
 -o $CORE_PATH/${SAMPLE_INFO_ARRAY[0]}/LOGS/${SAMPLE_INFO_ARRAY[1]}_${SAMPLE_INFO_ARRAY[0]}.GATHER_VCF.log \
@@ -816,7 +819,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","N.01_RUN_VQSR_SNV_"$1"_"$2,\
+print "qsub","-q","'$QUEUE_LIST'","-N","N.01_RUN_VQSR_SNV_"$1"_"$2,\
 "-hold_jid","M.01_GATHER_VCF_"$1"_"$2,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".VARIANT_RECALIBRATOR_SNP.log",\
 "'$SCRIPT_DIR'""/N.01_RUN_VQSR_SNV.sh",\
@@ -831,7 +834,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","N.02_RUN_VQSR_INDEL_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","N.02_RUN_VQSR_INDEL_"$2"_"$1,\
 "-hold_jid","M.01_GATHER_VCF_"$1"_"$2,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".VARIANT_RECALIBRATOR_INDEL.log",\
 "'$SCRIPT_DIR'""/N.02_RUN_VQSR_INDEL.sh",\
@@ -846,7 +849,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","O.01_APPLY_VQSR_SNP_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","O.01_APPLY_VQSR_SNP_"$2"_"$1,\
 "-hold_jid","N.02_RUN_VQSR_INDEL_"$2"_"$1",N.01_RUN_VQSR_SNV_"$1"_"$2,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".APPLY_RECALIBRATION_SNP.log",\
 "'$SCRIPT_DIR'""/O.01_APPLY_VQSR_SNV.sh",\
@@ -861,7 +864,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
 "-hold_jid","O.01_APPLY_VQSR_SNP_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".APPLY_VQSR_INDEL.log",\
 "'$SCRIPT_DIR'""/P.01_APPLY_VQSR_INDEL.sh",\
@@ -880,7 +883,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.01_EXTRACT_VCF_WG_PASS_VARIANT_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.01_EXTRACT_VCF_WG_PASS_VARIANT_"$2"_"$1,\
 "-hold_jid","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_VCF_WG_PASS_VARIANT.log",\
 "'$SCRIPT_DIR'""/Q.01_EXTRACT_VCF_WG_PASS_VARIANT.sh",\
@@ -897,7 +900,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.02_EXTRACT_SNV_WG_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.02_EXTRACT_SNV_WG_"$2"_"$1,\
 "-hold_jid","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_SNV_WG.log",\
 "'$SCRIPT_DIR'""/Q.02_EXTRACT_SNV_WG.sh",\
@@ -910,7 +913,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.03_EXTRACT_SNV_WG_PASS_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.03_EXTRACT_SNV_WG_PASS_"$2"_"$1,\
 "-hold_jid","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_SNV_WG_PASS.log",\
 "'$SCRIPT_DIR'""/Q.03_EXTRACT_SNV_WG_PASS.sh",\
@@ -923,7 +926,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.03-A.01_TITV_WG_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.03-A.01_TITV_WG_"$2"_"$1,\
 "-hold_jid","Q.03_EXTRACT_SNV_WG_PASS_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".TITV_WG.log",\
 "'$SCRIPT_DIR'""/Q.03-A.01_TITV_WG.sh",\
@@ -936,7 +939,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.03-A.02_EXTRACT_WG_KNOWN_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.03-A.02_EXTRACT_WG_KNOWN_"$2"_"$1,\
 "-hold_jid","Q.03_EXTRACT_SNV_WG_PASS_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_WG_KNOWN.log",\
 "'$SCRIPT_DIR'""/Q.03-A.02_EXTRACT_WG_KNOWN.sh",\
@@ -949,7 +952,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.03-A.02-A.01_TITV_WG_KNOWN_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.03-A.02-A.01_TITV_WG_KNOWN_"$2"_"$1,\
 "-hold_jid","Q.03-A.02_EXTRACT_WG_KNOWN_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".TITV_WG_KNOWN.log",\
 "'$SCRIPT_DIR'""/Q.03-A.02-A.01_TITV_WG_KNOWN.sh",\
@@ -962,7 +965,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.03-A.03_EXTRACT_WG_NOVEL_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.03-A.03_EXTRACT_WG_NOVEL_"$2"_"$1,\
 "-hold_jid","Q.03_EXTRACT_SNV_WG_PASS_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_WG_NOVEL.log",\
 "'$SCRIPT_DIR'""/Q.03-A.03_EXTRACT_WG_NOVEL.sh",\
@@ -975,7 +978,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.03-A.03-A.01_TITV_WG_NOVEL_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.03-A.03-A.01_TITV_WG_NOVEL_"$2"_"$1,\
 "-hold_jid","Q.03-A.03_EXTRACT_WG_NOVEL_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".TITV_WG_NOVEL.log",\
 "'$SCRIPT_DIR'""/Q.03-A.03-A.01_TITV_WG_NOVEL.sh",\
@@ -988,7 +991,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.03-A.04_CONCORDANCE_WG_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.03-A.04_CONCORDANCE_WG_"$2"_"$1,\
 "-hold_jid","Q.03_EXTRACT_SNV_WG_PASS_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".CONCORDANCE_WG.log",\
 "'$SCRIPT_DIR'""/Q.03-A.04_CONCORDANCE_WG.sh",\
@@ -1005,7 +1008,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.04_EXTRACT_VCF_CODING_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.04_EXTRACT_VCF_CODING_"$2"_"$1,\
 "-hold_jid","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_VCF_CODING_.log",\
 "'$SCRIPT_DIR'""/Q.04_EXTRACT_VCF_CODING.sh",\
@@ -1018,7 +1021,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.05_EXTRACT_VCF_CODING_PASS_VARIANT_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.05_EXTRACT_VCF_CODING_PASS_VARIANT_"$2"_"$1,\
 "-hold_jid","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_VCF_CODING_PASS_VARIANT.log",\
 "'$SCRIPT_DIR'""/Q.05_EXTRACT_VCF_CODING_PASS_VARIANT.sh",\
@@ -1035,7 +1038,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.06_EXTRACT_SNV_CODING_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.06_EXTRACT_SNV_CODING_"$2"_"$1,\
 "-hold_jid","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_SNV_CODING.log",\
 "'$SCRIPT_DIR'""/Q.06_EXTRACT_SNV_CODING.sh",\
@@ -1048,7 +1051,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.07_EXTRACT_SNV_CODING_PASS_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.07_EXTRACT_SNV_CODING_PASS_"$2"_"$1,\
 "-hold_jid","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_SNV_CODING_PASS.log",\
 "'$SCRIPT_DIR'""/Q.07_EXTRACT_SNV_CODING_PASS.sh",\
@@ -1061,7 +1064,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.07-A.01_TITV_CODING_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.07-A.01_TITV_CODING_"$2"_"$1,\
 "-hold_jid","Q.07_EXTRACT_SNV_CODING_PASS_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".TITV_CODING.log",\
 "'$SCRIPT_DIR'""/Q.07-A.01_TITV_CODING.sh",\
@@ -1074,7 +1077,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.07-A.02_EXTRACT_CODING_KNOWN_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.07-A.02_EXTRACT_CODING_KNOWN_"$2"_"$1,\
 "-hold_jid","Q.07_EXTRACT_SNV_CODING_PASS_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_CODING_KNOWN.log",\
 "'$SCRIPT_DIR'""/Q.07-A.02_EXTRACT_CODING_KNOWN.sh",\
@@ -1087,7 +1090,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.07-A.02-A.01_TITV_CODING_KNOWN_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.07-A.02-A.01_TITV_CODING_KNOWN_"$2"_"$1,\
 "-hold_jid","Q.07-A.02_EXTRACT_CODING_KNOWN_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".TITV_CODING_KNOWN.log",\
 "'$SCRIPT_DIR'""/Q.07-A.02-A.01_TITV_CODING_KNOWN.sh",\
@@ -1100,7 +1103,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.07-A.03_EXTRACT_CODING_NOVEL_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.07-A.03_EXTRACT_CODING_NOVEL_"$2"_"$1,\
 "-hold_jid","Q.07_EXTRACT_SNV_CODING_PASS_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_CODING_NOVEL_.log",\
 "'$SCRIPT_DIR'""/Q.07-A.03_EXTRACT_CODING_NOVEL.sh",\
@@ -1113,7 +1116,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.07-A.03-A.01_TITV_CODING_NOVEL_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.07-A.03-A.01_TITV_CODING_NOVEL_"$2"_"$1,\
 "-hold_jid","Q.07_EXTRACT_SNV_CODING_PASS_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".TITV_CODING_NOVEL.log",\
 "'$SCRIPT_DIR'""/Q.07-A.03-A.01_TITV_CODING_NOVEL.sh",\
@@ -1130,7 +1133,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.08_EXTRACT_INDEL_WG_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.08_EXTRACT_INDEL_WG_"$2"_"$1,\
 "-hold_jid","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_INDEL_WG.log",\
 "'$SCRIPT_DIR'""/Q.08_EXTRACT_INDEL_WG.sh",\
@@ -1143,7 +1146,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.09_EXTRACT_INDEL_WG_PASS_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.09_EXTRACT_INDEL_WG_PASS_"$2"_"$1,\
 "-hold_jid","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_INDEL_WG_PASS.log",\
 "'$SCRIPT_DIR'""/Q.09_EXTRACT_INDEL_WG_PASS.sh",\
@@ -1160,7 +1163,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.10_EXTRACT_INDEL_CODING_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.10_EXTRACT_INDEL_CODING_"$2"_"$1,\
 "-hold_jid","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_INDEL_CODING.log",\
 "'$SCRIPT_DIR'""/Q.10_EXTRACT_INDEL_CODING.sh",\
@@ -1173,7 +1176,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.11_EXTRACT_INDEL_CODING_PASS_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.11_EXTRACT_INDEL_CODING_PASS_"$2"_"$1,\
 "-hold_jid","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_INDEL_CODING_PASS.log",\
 "'$SCRIPT_DIR'""/Q.11_EXTRACT_INDEL_CODING_PASS.sh",\
@@ -1190,7 +1193,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.12_EXTRACT_MIXED_WG_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.12_EXTRACT_MIXED_WG_"$2"_"$1,\
 "-hold_jid","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_MIXED_WG.log",\
 "'$SCRIPT_DIR'""/Q.12_EXTRACT_MIXED_WG.sh",\
@@ -1203,7 +1206,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.13_EXTRACT_MIXED_WG_PASS_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.13_EXTRACT_MIXED_WG_PASS_"$2"_"$1,\
 "-hold_jid","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_MIXED_WG_PASS.log",\
 "'$SCRIPT_DIR'""/Q.13_EXTRACT_MIXED_WG_PASS.sh",\
@@ -1221,7 +1224,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.14_EXTRACT_MIXED_CODING_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.14_EXTRACT_MIXED_CODING_"$2"_"$1,\
 "-hold_jid","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_MIXED_CODING.log",\
 "'$SCRIPT_DIR'""/Q.14_EXTRACT_MIXED_CODING.sh",\
@@ -1234,7 +1237,7 @@ sed 's/\r//g; s/,/\t/g' $SAMPLE_SHEET \
 | sort -k 1,1 -k 2,2 \
 | uniq \
 | awk '{split($2,smtag,"[@-]"); \
-print "qsub","-N","Q.15_EXTRACT_MIXED_CODING_PASS_"$2"_"$1,\
+print "qsub","-q","'$QUEUE_LIST'","-N","Q.15_EXTRACT_MIXED_CODING_PASS_"$2"_"$1,\
 "-hold_jid","P.01_APPLY_VQSR_INDEL_"$2"_"$1,\
 "-o","'$CORE_PATH'/"$1"/LOGS/"$2"_"$1".EXTRACT_MIXED_CODING_PASS.log",\
 "'$SCRIPT_DIR'""/Q.15_EXTRACT_MIXED_CODING_PASS.sh",\
@@ -1251,7 +1254,7 @@ print "qsub","-N","Q.15_EXTRACT_MIXED_CODING_PASS_"$2"_"$1,\
 # | sort -k 1,1 -k 2,2 -k 3,3 \
 # | uniq \
 # | awk '{split($3,smtag,"[@-]"); \
-# print "qsub","-N","H.03-A.01_DOC_CHROM_DEPTH_"$3"_"$1,\
+# print "qsub","-q","'$QUEUE_LIST'","-N","H.03-A.01_DOC_CHROM_DEPTH_"$3"_"$1,\
 # "-hold_jid","H.03_DOC_CODING_10bpFLANKS_"$3"_"$1,\
 # "-o","'$CORE_PATH'/"$1"/"$2"/"$3"/LOGS/"$3"_"$1".ANEUPLOIDY_CHECK.log",\
 # "'$SCRIPT_DIR'""/H.03-A.01_CHROM_DEPTH.sh",\
@@ -1270,7 +1273,7 @@ print "qsub","-N","Q.15_EXTRACT_MIXED_CODING_PASS_"$2"_"$1,\
 # CALL_SELECT_VERIFY_BAM ()
 # {
 # echo \
-# qsub \
+# qsub -q $QUEUE_LIST \
 # -N H.09_SELECT_VERIFYBAMID_VCF_${SAMPLE_INFO_ARRAY_VERIFY_BAM[2]}_${SAMPLE_INFO_ARRAY_VERIFY_BAM[0]}_chr$CHROMOSOME \
 # -hold_jid G.01_FINAL_BAM_${SAMPLE_INFO_ARRAY_VERIFY_BAM[2]}_${SAMPLE_INFO_ARRAY_VERIFY_BAM[0]} \
 # -o $CORE_PATH/${SAMPLE_INFO_ARRAY_VERIFY_BAM[0]}/${SAMPLE_INFO_ARRAY_VERIFY_BAM[1]}/${SAMPLE_INFO_ARRAY_VERIFY_BAM[2]}/LOGS/${SAMPLE_INFO_ARRAY_VERIFY_BAM[2]}_${SAMPLE_INFO_ARRAY_VERIFY_BAM[0]}.SELECT_VERIFYBAMID_chr$CHROMOSOME.log \
@@ -1283,7 +1286,7 @@ print "qsub","-N","Q.15_EXTRACT_MIXED_CODING_PASS_"$2"_"$1,\
 # CALL_VERIFYBAMID ()
 # {
 # echo \
-# qsub \
+# qsub -q $QUEUE_LIST \
 # -N H.09-A.01_VERIFYBAMID_${SAMPLE_INFO_ARRAY_VERIFY_BAM[2]}_${SAMPLE_INFO_ARRAY_VERIFY_BAM[0]}_chr$CHROMOSOME \
 # -hold_jid H.09_SELECT_VERIFYBAMID_VCF_${SAMPLE_INFO_ARRAY_VERIFY_BAM[2]}_${SAMPLE_INFO_ARRAY_VERIFY_BAM[0]}_chr$CHROMOSOME \
 # -o $CORE_PATH/${SAMPLE_INFO_ARRAY_VERIFY_BAM[0]}/${SAMPLE_INFO_ARRAY_VERIFY_BAM[1]}/${SAMPLE_INFO_ARRAY_VERIFY_BAM[2]}/LOGS/${SAMPLE_INFO_ARRAY_VERIFY_BAM[2]}_${SAMPLE_INFO_ARRAY_VERIFY_BAM[0]}.VERIFYBAMID_chr$CHROMOSOME.log \
@@ -1324,7 +1327,7 @@ print "qsub","-N","Q.15_EXTRACT_MIXED_CODING_PASS_"$2"_"$1,\
 #  CAT_VERIFYBAMID_CHR ()
 #  {
 # echo \
-# qsub \
+# qsub -q $QUEUE_LIST \
 # -N H.09-A.01-A.01_JOIN_VERIFYBAMID_${SAMPLE_INFO_ARRAY_VERIFY_BAM[2]}_${SAMPLE_INFO_ARRAY_VERIFY_BAM[0]} \
 # $HOLD_ID_PATH \
 # -o $CORE_PATH/${SAMPLE_INFO_ARRAY_VERIFY_BAM[0]}/${SAMPLE_INFO_ARRAY_VERIFY_BAM[1]}/${SAMPLE_INFO_ARRAY_VERIFY_BAM[2]}/LOGS/${SAMPLE_INFO_ARRAY_VERIFY_BAM[2]}_${SAMPLE_INFO_ARRAY_VERIFY_BAM[0]}.CAT_VERIFYBAMID_CHR.log \
@@ -1356,7 +1359,7 @@ print "qsub","-N","Q.15_EXTRACT_MIXED_CODING_PASS_"$2"_"$1,\
 # CALL_VARIANT_TO_TABLE_COHORT_ALL_SITES ()
 # {
 # echo \
-# qsub \
+# qsub -q $QUEUE_LIST \
 # -N P.01-A.02_VARIANT_TO_TABLE_COHORT_ALL_SITES_${FAMILY_ONLY_ARRAY[1]}_${FAMILY_ONLY_ARRAY[0]}_$CHROMOSOME \
 # -hold_jid P.01_VARIANT_ANNOTATOR_${FAMILY_ONLY_ARRAY[1]}_${FAMILY_ONLY_ARRAY[0]}_$CHROMOSOME \
 # -o $CORE_PATH/${FAMILY_ONLY_ARRAY[0]}/${FAMILY_ONLY_ARRAY[1]}/LOGS/${FAMILY_ONLY_ARRAY[1]}_${FAMILY_ONLY_ARRAY[0]}.VARIANT_TO_TABLE_COHORT_ALL_SITES_$CHROMOSOME.log \
@@ -1394,7 +1397,7 @@ print "qsub","-N","Q.15_EXTRACT_MIXED_CODING_PASS_"$2"_"$1,\
 # CALL_VARIANT_TO_TABLE_COHORT_GATHER ()
 # {
 # echo \
-# qsub \
+# qsub -q $QUEUE_LIST \
 # -N T.18_VARIANT_TO_TABLE_COHORT_ALL_SITES_GATHER_${FAMILY_INFO_ARRAY[2]}_${FAMILY_INFO_ARRAY[0]} \
 #  ${HOLD_ID_PATH} \
 #  -o $CORE_PATH/${FAMILY_INFO_ARRAY[0]}/${FAMILY_INFO_ARRAY[2]}/LOGS/${FAMILY_INFO_ARRAY[2]}_${FAMILY_INFO_ARRAY[0]}.VARIANT_TO_TABLE_COHORT_ALL_SITES_GATHER.log \
@@ -1419,7 +1422,7 @@ print "qsub","-N","Q.15_EXTRACT_MIXED_CODING_PASS_"$2"_"$1,\
 # ~/CGC_PIPELINE_TEMP/$MANIFEST_PREFIX.$PED_PREFIX.join.txt \
 # | sort -k 1,1 -k 2,2 \
 # | uniq \
-# | awk '{print "qsub","-N","T.18-A.01_VARIANT_TO_TABLE_BGZIP_COHORT_ALL_SITES_"$2"_"$1,\
+# | awk '{print "qsub","-q","'$QUEUE_LIST'","-N","T.18-A.01_VARIANT_TO_TABLE_BGZIP_COHORT_ALL_SITES_"$2"_"$1,\
 # "-hold_jid","T.18_VARIANT_TO_TABLE_COHORT_ALL_SITES_GATHER_"$2"_"$1,\
 # "-o","'$CORE_PATH'/"$1"/"$2"/LOGS/"$2"_"$1".VARIANT_TO_TABLE_BGZIP_COHORT_ALL_SITES.log",\
 # "'$SCRIPT_DIR'""/T.18-A.01_VARIANT_TO_TABLE_BGZIP_COHORT_ALL_SITES.sh",\
@@ -1433,7 +1436,7 @@ print "qsub","-N","Q.15_EXTRACT_MIXED_CODING_PASS_"$2"_"$1,\
 # ~/CGC_PIPELINE_TEMP/$MANIFEST_PREFIX.$PED_PREFIX.join.txt \
 # | sort -k 1,1 -k 2,2 \
 # | uniq \
-# | awk '{print "qsub","-N","T.18-A.01-A.01_VARIANT_TO_TABLE_TABIX_COHORT_ALL_SITES_"$2"_"$1,\
+# | awk '{print "qsub","-q","'$QUEUE_LIST'","-N","T.18-A.01-A.01_VARIANT_TO_TABLE_TABIX_COHORT_ALL_SITES_"$2"_"$1,\
 # "-hold_jid","T.18-A.01_VARIANT_TO_TABLE_BGZIP_COHORT_ALL_SITES_"$2"_"$1,\
 # "-o","'$CORE_PATH'/"$1"/"$2"/LOGS/"$2"_"$1".VARIANT_TO_TABLE_TABIX_COHORT_ALL_SITES.log",\
 # "'$SCRIPT_DIR'""/T.18-A.01-A.01_VARIANT_TO_TABLE_TABIX_COHORT_ALL_SITES.sh",\
@@ -1448,7 +1451,7 @@ print "qsub","-N","Q.15_EXTRACT_MIXED_CODING_PASS_"$2"_"$1,\
 # | sort -k 1,1 -k 2,2 -k 3,3 \
 # | uniq \
 # | awk 'BEGIN {FS="\t"}
-# {print "qsub","-N","X.01-QC_REPORT_PREP_"$1"_"$3,\
+# {print "qsub","-q","'$QUEUE_LIST'","-N","X.01-QC_REPORT_PREP_"$1"_"$3,\
 # "-hold_jid","T.06-2-A.01-A.01-A.01_VARIANT_TO_TABLE_TABIX_SAMPLE_ALL_SITES_"$3"_"$2"_"$1,\
 # "-o","'$CORE_PATH'/"$1"/LOGS/"$3"_"$1".QC_REPORT_PREP.log",\
 # "'$SCRIPT_DIR'""/X.01-QC_REPORT_PREP.sh",\
@@ -1463,7 +1466,7 @@ print "qsub","-N","Q.15_EXTRACT_MIXED_CODING_PASS_"$2"_"$1,\
 # | $DATAMASH_DIR/datamash -s -g 1 collapse 2 \
 # | awk 'BEGIN {FS="\t"}
 # gsub (/,/,",X.01-QC_REPORT_PREP_"$1"_",$2) \
-# {print "qsub","-N","X.01-X.01-END_PROJECT_TASKS_"$1,\
+# {print "qsub","-q","'$QUEUE_LIST'","-N","X.01-X.01-END_PROJECT_TASKS_"$1,\
 # "-hold_jid","X.01-QC_REPORT_PREP_"$1"_"$2,\
 # "-o","'$CORE_PATH'/"$1"/LOGS/"$1".END_PROJECT_TASKS.log",\
 # "'$SCRIPT_DIR'""/X.01-X.01-END_PROJECT_TASKS.sh",\
