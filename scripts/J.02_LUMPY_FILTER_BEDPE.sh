@@ -48,12 +48,19 @@ READ_LENGTH=`awk 'NR==10 {print $16}' $CORE_PATH/$PROJECT/REPORTS/ALIGNMENT_SUMM
 
 echo READ LENGTH IS $READ_LENGTH
 
-START_LUMPY_ALL_VCF=`date '+%s'`
+START_LUMPY_FILTERED_VCF=`date '+%s'`
 
-$LUMPY_DIR/lumpy \
+# Run lumpy to create filtered vcf, excluding LCR and high depth regions, write a vcf file
+# replace with bedtools
+
+$LUMPY_DIR\lumpy \
 -mw 4 \
 -tt 0 \
--t $TMPDIR/$SM_TAG"_LUMPY_ALL_VCF" \
+-e \
+-P \
+-b \
+-x $CORE_PATH/$PROJECT/LUMPY/BAM/$SM_TAG.exclude.bed \
+-x $LCR \
 -pe \
 id:$SM_TAG,\
 bam_file:$CORE_PATH/$PROJECT/LUMPY/BAM/$SM_TAG".lumpy.discordant.pe.sort.bam",\
@@ -68,21 +75,25 @@ weight:1,\
 min_mapping_threshold:20 \
 -sr \
 id:$SM_TAG,\
-bam_file:$CORE_PATH/$PROJECT/LUMPY/BAM/$SM_TAG".lumpy.discordant.split.reads.sort.bam",\
+bam_file:$CORE_PATH/$PROJECT/LUMPY/BAM/$SM_TAG".lumpy.discordant.split.reads.sort.bam"\
 back_distance:10,\
 weight:1,\
 min_mapping_threshold:20 \
->| $CORE_PATH/$PROJECT/LUMPY/VCF/$SM_TAG.LUMPY.ALL.vcf
+>| $CORE_PATH/$PROJECT/LUMPY/VCF/$SM_TAG.LUMPY.FILTERED.pe.bed
 
-END_LUMPY_ALL_VCF=`date '+%s'`
+END_LUMPY_FILTERED_VCF=`date '+%s'`
 
-echo $SM_TAG"_"$PROJECT",I.01,LUMPY_ALL_VCF,"$HOSTNAME","$START_LUMPY_ALL_VCF","$END_LUMPY_ALL_VCF\
+echo $SM_TAG"_"$PROJECT",K.01,LUMPY_FILTERED_VCF,"$HOSTNAME","$START_LUMPY_FILTERED_VCF","$END_LUMPY_FILTERED_VCF\
 >> $CORE_PATH/$PROJECT/$PROJECT".WALL.CLOCK.TIMES.csv"
 
-echo $LUMPY_DIR/lumpy \
+echo $LUMPY_DIR\lumpy \
 -mw 4 \
 -tt 0 \
--t $TMPDIR/$SM_TAG"_LUMPY_ALL_VCF" \
+-e \
+-P \
+-b \
+-x $CORE_PATH/$PROJECT/LUMPY/BAM/$SM_TAG.exclude.bed \
+-x $LCR \
 -pe \
 id:$SM_TAG,\
 bam_file:$CORE_PATH/$PROJECT/LUMPY/BAM/$SM_TAG".lumpy.discordant.pe.sort.bam",\
@@ -101,5 +112,5 @@ bam_file:$CORE_PATH/$PROJECT/LUMPY/BAM/$SM_TAG".lumpy.discordant.split.reads.sor
 back_distance:10,\
 weight:1,\
 min_mapping_threshold:20 \
-\>\| $CORE_PATH/$PROJECT/LUMPY/VCF/$SM_TAG.LUMPY.ALL.vcf \
->> $CORE_PATH/$PROJECT/COMMAND_LINES/$SM_TAG".COMMAND_LINES.txt"
+\>\| $CORE_PATH/$PROJECT/LUMPY/VCF/$SM_TAG.LUMPY.FILTERED.pe.bed \
+>| $CORE_PATH/$PROJECT/COMMAND_LINES/$SM_TAG".COMMAND_LINES.txt"

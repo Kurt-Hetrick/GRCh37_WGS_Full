@@ -51,10 +51,9 @@ echo READ LENGTH IS $READ_LENGTH
 START_LUMPY_ALL_BEDPE=`date '+%s'`
 
 $LUMPY_DIR/lumpy \
+-t $TMPDIR/$SM_TAG"_LUMPY_ALL_VCF" \
 -mw 4 \
 -tt 0 \
--e \
--P \
 -b \
 -pe \
 id:$SM_TAG,\
@@ -70,7 +69,7 @@ weight:1,\
 min_mapping_threshold:20 \
 -sr \
 id:$SM_TAG,\
-bam_file:$CORE_PATH/$PROJECT/LUMPY/BAM/$SM_TAG".lumpy.discordant.split.reads.sort.bam"\
+bam_file:$CORE_PATH/$PROJECT/LUMPY/BAM/$SM_TAG".lumpy.discordant.split.reads.sort.bam",\
 back_distance:10,\
 weight:1,\
 min_mapping_threshold:20 \
@@ -82,10 +81,9 @@ echo $SM_TAG"_"$PROJECT",I.01,LUMPY_ALL_BEDPE,"$HOSTNAME","$START_LUMPY_ALL_BEDP
 >> $CORE_PATH/$PROJECT/$PROJECT".WALL.CLOCK.TIMES.csv"
 
 echo $LUMPY_DIR/lumpy \
+-t $TMPDIR/$SM_TAG"_LUMPY_ALL_VCF" \
 -mw 4 \
 -tt 0 \
--e \
--P \
 -b \
 -pe \
 id:$SM_TAG,\
