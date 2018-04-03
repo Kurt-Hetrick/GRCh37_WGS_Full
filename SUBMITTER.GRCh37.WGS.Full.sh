@@ -59,7 +59,7 @@ DBSNP_129="/isilon/sequencing/GATK_resource_bundle/2.8/b37/dbsnp_138.b37.excludi
 
 GATK_KEY="/isilon/sequencing/CIDRSeqSuiteSoftware/gatk/GATK_2/lee.watkins_jhmi.edu.key"
 
-QUEUE_LIST=`qstat -f -s r | egrep -v "^[0-9]|^-|^queue" | cut -d @ -f 1 | sort | uniq | egrep -v "bigmem.q|all.q|cgc.q|programmers.q" | datamash collapse 1 | awk '{print $1}'`
+QUEUE_LIST=`qstat -f -s r | egrep -v "^[0-9]|^-|^queue" | cut -d @ -f 1 | sort | uniq | egrep -v "bigmem.q|all.q|cgc.q|programmers.q|uhoh.q|rhel7.q|lemon.q" | datamash collapse 1 | awk '{print $1}'`
 
 #################################
 ##### MAKE A DIRECTORY TREE #####
